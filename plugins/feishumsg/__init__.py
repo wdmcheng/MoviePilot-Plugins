@@ -4,6 +4,7 @@ import hmac
 import time
 from typing import Any, List, Dict, Tuple
 
+from app.core.config import settings
 from app.core.event import eventmanager, Event
 from app.log import logger
 from app.plugins import _PluginBase
@@ -19,7 +20,7 @@ class FeiShuMsg(_PluginBase):
     # 插件图标
     plugin_icon = "FeiShu_A.png"
     # 插件版本
-    plugin_version = "1.0"
+    plugin_version = "1.1"
     # 插件作者
     plugin_author = "InfinityPacer"
     # 作者主页
@@ -180,6 +181,12 @@ class FeiShuMsg(_PluginBase):
         if not event.event_data:
             return
 
+        # MoviePilot 版本判断
+        if hasattr(settings, 'VERSION_FLAG'):
+            version = settings.VERSION_FLAG  # V2
+        else:
+            version = "v1"
+
         msg_body = event.event_data
         # 渠道
         channel = msg_body.get("channel")
@@ -187,7 +194,8 @@ class FeiShuMsg(_PluginBase):
             logger.info(f"channel: {channel} 不进行消息推送")
             return
         # 类型
-        msg_type: NotificationType = msg_body.get("type")
+        msg_type: NotificationType = msg_body.get("type") if version == "v1" \
+            else NotificationType(msg_body.get("mtype"))
         # 标题
         title = msg_body.get("title")
         # 文本
