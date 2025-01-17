@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.0"
+    plugin_version = "1.0.1"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -104,8 +104,12 @@ class CloudCopy(_PluginBase):
     _monitor_dirs = ""
     _exclude_keywords = ""
     _interval: int = 10
-    # 是否保持原始目录结构。如果保持原始结构，二级分类与重命名将失效。
+    # 是否保持原始目录结构。如果保持原始结构，二级分类将失效，并且不会重命名。
     _keep_structure = True
+    # 是否忽略未识别到媒体信息错误。未识别到媒体信息会自动关闭当前文件的重命名。二级分类、刮削等功能开启时，需要媒体信息，会导致此功能失效。
+    _ignore_meta_info_error = True
+    # 计算最终是否忽略媒体信息错误
+    _ignore_meta_info_error_flag = _ignore_meta_info_error and not (_category or _scrape)
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
@@ -147,6 +151,7 @@ class CloudCopy(_PluginBase):
             self._softlink = config.get("softlink")
             self._strm = config.get("strm")
             self._keep_structure = config.get("keep_structure")
+            self._ignore_meta_info_error = config.get("ignore_meta_info_error")
 
         # 停止现有任务
         self.stop_service()
@@ -279,6 +284,7 @@ class CloudCopy(_PluginBase):
             "size": self._size,
             "refresh": self._refresh,
             "keep_structure": self._keep_structure,
+            "ignore_meta_info_error": self._ignore_meta_info_error,
         })
 
     @eventmanager.register(EventType.PluginAction)
@@ -387,7 +393,7 @@ class CloudCopy(_PluginBase):
 
                 # 元数据
                 file_meta = MetaInfoPath(file_path)
-                if not file_meta.name:
+                if not file_meta.name and not self._ignore_meta_info_error_flag:
                     logger.error(f"{file_path.name} 无法识别有效信息")
                     return
 
@@ -407,8 +413,11 @@ class CloudCopy(_PluginBase):
                     logger.warn(f"{event_path.name} 未找到对应的文件")
                     return
                 # 识别媒体信息
-                mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
-                if not mediainfo:
+                if not file_meta.name:
+                    mediainfo: MediaInfo = None
+                else:
+                    mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
+                if not mediainfo and not self._ignore_meta_info_error_flag:
                     logger.warn(f'未识别到媒体信息，标题：{file_meta.name}')
                     # 新增转移成功历史记录
                     his = self.transferhis.add_fail(
@@ -424,23 +433,29 @@ class CloudCopy(_PluginBase):
                         )
                     return
 
-                # 如果未开启新增已入库媒体是否跟随TMDB信息变化则根据tmdbid查询之前的title
-                if not settings.SCRAP_FOLLOW_TMDB:
-                    transfer_history = self.transferhis.get_by_type_tmdbid(tmdbid=mediainfo.tmdb_id,
-                                                                           mtype=mediainfo.type.value)
-                    if transfer_history:
-                        mediainfo.title = transfer_history.title
-                logger.info(f"{file_path.name} 识别为：{mediainfo.type.value} {mediainfo.title_year}")
-
-                # 获取集数据
-                if mediainfo.type == MediaType.TV:
-                    episodes_info = self.tmdbchain.tmdb_episodes(tmdbid=mediainfo.tmdb_id,
-                                                                 season=1 if file_meta.begin_season is None else file_meta.begin_season)
-                else:
+                if not mediainfo:
                     episodes_info = None
+                else:
+                    # 如果未开启新增已入库媒体是否跟随TMDB信息变化则根据tmdbid查询之前的title
+                    if not settings.SCRAP_FOLLOW_TMDB:
+                        transfer_history = self.transferhis.get_by_type_tmdbid(tmdbid=mediainfo.tmdb_id,
+                                                                               mtype=mediainfo.type.value)
+                        if transfer_history:
+                            mediainfo.title = transfer_history.title
+                    logger.info(f"{file_path.name} 识别为：{mediainfo.type.value} {mediainfo.title_year}")
+
+                    # 获取集数据
+                    if mediainfo.type == MediaType.TV:
+                        episodes_info = self.tmdbchain.tmdb_episodes(tmdbid=mediainfo.tmdb_id,
+                                                                     season=1 if file_meta.begin_season is None else file_meta.begin_season)
+                    else:
+                        episodes_info = None
 
                 # 查询转移目的目录
-                target_dir = DirectoryHelper().get_dir(mediainfo, src_path=Path(mon_path))
+                if not mediainfo:
+                    target_dir = None
+                else:
+                    target_dir = DirectoryHelper().get_dir(mediainfo, src_path=Path(mon_path))
                 if not target_dir or not target_dir.library_path:
                     target_dir = TransferDirectoryConf()
                     target_dir.library_path = target
@@ -455,6 +470,9 @@ class CloudCopy(_PluginBase):
                 if not target_dir.library_path:
                     logger.error(f"未配置监控目录 {mon_path} 的目的目录")
                     return
+
+                if not mediainfo:
+                    target_dir.renaming = False
 
                 # 保持原始目录结构
                 if self._keep_structure:
@@ -930,6 +948,32 @@ class CloudCopy(_PluginBase):
                         ]
                     },
                     {
+                        'component': 'VForm',
+                        'content': [
+                            {
+                                'component': 'VRow',
+                                'content': [
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VSwitch',
+                                                'props': {
+                                                    'model': 'ignore_meta_info_error',
+                                                    'label': '忽略媒体信息识别错误',
+                                                },
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
                         'component': 'VRow',
                         'content': [
                             {
@@ -1013,6 +1057,7 @@ class CloudCopy(_PluginBase):
                                             'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move：\n'
                                                            '监控目录:转移目的目录\n'
                                                            '监控目录:转移目的目录#转移方式\n'
+                                                           '监控目录:转移目的目录#转移方式@覆盖模式\n'
                                         }
                                     }
                                 ]
@@ -1103,6 +1148,48 @@ class CloudCopy(_PluginBase):
                                 ]
                             }
                         ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'info',
+                                            'variant': 'tonal',
+                                            'text': '如果开启保持原始结构，二级分类将失效，并且不会重命名。'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'info',
+                                            'variant': 'tonal',
+                                            'text': '忽略未识别到媒体信息错误：未识别到媒体信息会自动关闭当前文件的重命名。二级分类、刮削等需要媒体信息的功能开启时，会导致此功能失效。'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
@@ -1116,8 +1203,10 @@ class CloudCopy(_PluginBase):
             "refresh": True,
             "softlink": False,
             "strm": False,
+            "keep_structure": True,
+            "ignore_meta_info_error": True,
             "mode": "fast",
-            "transfer_type": "filesoftlink",
+            "transfer_type": "copy",
             "monitor_dirs": "",
             "exclude_keywords": "",
             "interval": 10,
