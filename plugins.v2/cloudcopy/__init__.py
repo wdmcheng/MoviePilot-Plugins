@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.4"
+    plugin_version = "1.0.5"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -503,11 +503,12 @@ class CloudCopy(_PluginBase):
                         state, error = None, f"不支持的整理方式：{transfer_type}"
                     if not state:
                         # 新增转移失败历史记录
-                        self.transferhis.add_fail(
-                            fileitem=file_item,
-                            mode=transfer_type,
-                            meta=file_meta
-                        )
+                        if self._history:
+                            self.transferhis.add_fail(
+                                fileitem=file_item,
+                                mode=transfer_type,
+                                meta=file_meta
+                            )
                         if self._notify:
                             self.post_message(
                                 mtype=NotificationType.Manual,
@@ -549,7 +550,7 @@ class CloudCopy(_PluginBase):
                         )
                     return
 
-                if self._history:
+                if self._history and mediainfo:
                     # 新增转移成功历史记录
                     self.transferhis.add_success(
                         fileitem=file_item,
