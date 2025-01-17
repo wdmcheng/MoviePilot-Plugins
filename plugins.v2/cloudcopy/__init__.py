@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.11"
+    plugin_version = "1.0.12"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -496,6 +496,7 @@ class CloudCopy(_PluginBase):
                 # 转移文件
                 if not mediainfo:
                     logger.debug(f"无 mediainfo 信息，直接处理 {file_path}")
+                    transferinfo = None
                     # 创建目录
                     if not target_file.parent.exists():
                         target_file.parent.mkdir(parents=True, exist_ok=True)
@@ -535,8 +536,11 @@ class CloudCopy(_PluginBase):
                                                                      episodes_info=episodes_info,
                                                                      scrape=self._scrape)
 
-                if not transferinfo and mediainfo:
-                    logger.error("文件转移模块运行失败")
+                if not transferinfo:
+                    if mediainfo:
+                        logger.error("文件转移模块运行失败")
+                    else:
+                        logger.info(f"处理完毕 -- {file_path}")
                     return
 
                 if not transferinfo.success and mediainfo:
