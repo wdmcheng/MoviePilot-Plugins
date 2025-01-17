@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.3"
+    plugin_version = "1.0.4"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -423,7 +423,7 @@ class CloudCopy(_PluginBase):
                     mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
                 if not mediainfo and not self._ignore_meta_info_error_flag:
                     logger.warn(f'未识别到媒体信息，标题：{file_meta.name}')
-                    # 新增转移成功历史记录
+                    # 新增转移失败历史记录
                     his = self.transferhis.add_fail(
                         fileitem=file_item,
                         mode=transfer_type,
@@ -486,13 +486,42 @@ class CloudCopy(_PluginBase):
                     target_dir.library_path = target_file.parent
 
                 # 转移文件
-                transferinfo: TransferInfo = self.chain.transfer(fileitem=file_item,
-                                                                 meta=file_meta,
-                                                                 mediainfo=mediainfo,
-                                                                 transfer_type=transfer_type,
-                                                                 target_directory=target_dir,
-                                                                 episodes_info=episodes_info,
-                                                                 scrape=self._scrape)
+                if not mediainfo:
+                    # 创建目录
+                    if not target_file.parent.exists():
+                        target_file.parent.mkdir(parents=True, exist_ok=True)
+                    # 本地到本地
+                    if transfer_type == "copy":
+                        state, error = SystemUtils.copy(file_path, target_file)
+                    elif transfer_type == "move":
+                        state, error = SystemUtils.move(file_path, target_file)
+                    elif transfer_type == "link":
+                        state, error = SystemUtils.link(file_path, target_file)
+                    elif transfer_type == "softlink":
+                        state, error = SystemUtils.softlink(file_path, target_file)
+                    else:
+                        state, error = None, f"不支持的整理方式：{transfer_type}"
+                    if not state:
+                        # 新增转移失败历史记录
+                        self.transferhis.add_fail(
+                            fileitem=file_item,
+                            mode=transfer_type,
+                            meta=file_meta
+                        )
+                        if self._notify:
+                            self.post_message(
+                                mtype=NotificationType.Manual,
+                                title=error
+                            )
+                        return
+                else:
+                    transferinfo: TransferInfo = self.chain.transfer(fileitem=file_item,
+                                                                     meta=file_meta,
+                                                                     mediainfo=mediainfo,
+                                                                     transfer_type=transfer_type,
+                                                                     target_directory=target_dir,
+                                                                     episodes_info=episodes_info,
+                                                                     scrape=self._scrape)
 
                 if not transferinfo:
                     logger.error("文件转移模块运行失败")
@@ -1006,9 +1035,7 @@ class CloudCopy(_PluginBase):
                                                 {'title': '移动', 'value': 'move'},
                                                 {'title': '复制', 'value': 'copy'},
                                                 {'title': '硬链接', 'value': 'link'},
-                                                {'title': '软链接', 'value': 'softlink'},
-                                                {'title': 'Rclone复制', 'value': 'rclone_copy'},
-                                                {'title': 'Rclone移动', 'value': 'rclone_move'}
+                                                {'title': '软链接', 'value': 'softlink'}
                                             ]
                                         }
                                     }
@@ -1048,7 +1075,7 @@ class CloudCopy(_PluginBase):
                                             'model': 'monitor_dirs',
                                             'label': '监控目录',
                                             'rows': 5,
-                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move：\n'
+                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink：\n'
                                                            '监控目录:转移目的目录\n'
                                                            '监控目录:转移目的目录#转移方式\n'
                                                            '监控目录:转移目的目录#转移方式@覆盖模式\n'
