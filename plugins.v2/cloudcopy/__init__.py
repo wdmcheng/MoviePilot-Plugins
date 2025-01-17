@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.5"
+    plugin_version = "1.0.6"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -104,6 +104,8 @@ class CloudCopy(_PluginBase):
     _monitor_dirs = ""
     _exclude_keywords = ""
     _interval: int = 10
+    # 识别媒体信息。保持目录树建议不开启识别媒体信息，处理过程可以提速很多；二级分类、刮削等功能需要依赖媒体信息，需要开启。
+    _fetch_mediainfo = False
     # 是否保持原始目录结构。如果保持原始结构，二级分类将失效，并且不会重命名。
     _keep_structure = True
     # 是否忽略未识别到媒体信息错误。未识别到媒体信息会自动关闭当前文件的重命名。二级分类、刮削等功能开启时，需要媒体信息，会导致此功能失效。
@@ -150,6 +152,7 @@ class CloudCopy(_PluginBase):
             self._size = config.get("size") or 0
             self._softlink = config.get("softlink")
             self._strm = config.get("strm")
+            self._fetch_mediainfo = config.get("fetch_mediainfo")
             self._keep_structure = config.get("keep_structure")
             self._ignore_meta_info_error = config.get("ignore_meta_info_error")
 
@@ -283,6 +286,7 @@ class CloudCopy(_PluginBase):
             "category": self._category,
             "size": self._size,
             "refresh": self._refresh,
+            "fetch_mediainfo": self._fetch_mediainfo,
             "keep_structure": self._keep_structure,
             "ignore_meta_info_error": self._ignore_meta_info_error,
         })
@@ -417,7 +421,7 @@ class CloudCopy(_PluginBase):
                     logger.warn(f"{event_path.name} 未找到对应的文件")
                     return
                 # 识别媒体信息
-                if not media_file_flag or not file_meta.name:
+                if not self._fetch_mediainfo or not media_file_flag or not file_meta.name:
                     mediainfo: MediaInfo = None
                 else:
                     mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
@@ -971,6 +975,22 @@ class CloudCopy(_PluginBase):
                                             {
                                                 'component': 'VSwitch',
                                                 'props': {
+                                                    'model': 'fetch_mediainfo',
+                                                    'label': '识别媒体信息',
+                                                },
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VSwitch',
+                                                'props': {
                                                     'model': 'keep_structure',
                                                     'label': '是否保持原始目录结构',
                                                 },
@@ -1185,6 +1205,27 @@ class CloudCopy(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
+                                            'text': '保持目录树建议不开启识别媒体信息，处理过程可以提速很多。二级分类、刮削等功能需要依赖媒体信息，需要开启。'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'info',
+                                            'variant': 'tonal',
                                             'text': '如果开启保持原始结构，二级分类将失效，并且不会重命名。'
                                         }
                                     }
@@ -1225,6 +1266,7 @@ class CloudCopy(_PluginBase):
             "refresh": True,
             "softlink": False,
             "strm": False,
+            "fetch_mediainfo": False,
             "keep_structure": True,
             "ignore_meta_info_error": True,
             "mode": "fast",
