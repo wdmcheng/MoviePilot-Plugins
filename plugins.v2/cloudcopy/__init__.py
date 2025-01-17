@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.6"
+    plugin_version = "1.0.7"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -491,6 +491,7 @@ class CloudCopy(_PluginBase):
 
                 # 转移文件
                 if not mediainfo:
+                    logger.debug(f"无 mediainfo 信息，直接处理 {file_path}")
                     # 创建目录
                     if not target_file.parent.exists():
                         target_file.parent.mkdir(parents=True, exist_ok=True)
@@ -520,6 +521,7 @@ class CloudCopy(_PluginBase):
                             )
                         return
                 else:
+                    logger.debug(f"调用 transfer 模块处理 {file_path}")
                     transferinfo: TransferInfo = self.chain.transfer(fileitem=file_item,
                                                                      meta=file_meta,
                                                                      mediainfo=mediainfo,
@@ -528,11 +530,11 @@ class CloudCopy(_PluginBase):
                                                                      episodes_info=episodes_info,
                                                                      scrape=self._scrape)
 
-                if not transferinfo:
+                if not transferinfo and mediainfo:
                     logger.error("文件转移模块运行失败")
                     return
 
-                if not transferinfo.success:
+                if not transferinfo.success and mediainfo:
                     # 转移失败
                     logger.warn(f"{file_path.name} 入库失败：{transferinfo.message}")
 
@@ -565,7 +567,7 @@ class CloudCopy(_PluginBase):
                     )
 
                 # 刮削
-                if self._scrape:
+                if self._scrape and mediainfo:
                     self.mediaChain.scrape_metadata(fileitem=transferinfo.target_diritem,
                                                     meta=file_meta,
                                                     mediainfo=mediainfo)

@@ -3,11 +3,12 @@
     "name": "拷贝到云盘",
     "description": "监控目录文件变化，自动复制到云盘。",
     "labels": "文件整理,云盘",
-    "version": "1.0.3",
+    "version": "1.0.7",
     "icon": "Linkease_A.png",
     "author": "wdmcheng",
     "level": 1,
     "history": {
+      "v1.0.7": "fix bugs",
       "v1.0.6": "识别媒体信息开关，关闭可处理提速，但无法使用二级分类、刮削、重命名等功能",
       "v1.0.5": "fix bugs",
       "v1.0.4": "修复未识别媒体信息时的文件处理",
