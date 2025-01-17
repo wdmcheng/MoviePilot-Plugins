@@ -375,10 +375,14 @@ class CloudCopy(_PluginBase):
                             logger.info(f"{event_path} 命中整理屏蔽词 {keyword}，不处理")
                             return
 
-                # 不是媒体文件不处理
+                # 未开启保持目录树，不是媒体文件不处理
+                media_file_flag = True
                 if file_path.suffix not in settings.RMT_MEDIAEXT:
-                    logger.debug(f"{event_path} 不是媒体文件")
-                    return
+                    if not self._keep_structure:
+                        logger.debug(f"{event_path} 不是媒体文件")
+                        return
+                    else:
+                        media_file_flag = False
 
                 # 判断是不是蓝光目录
                 if re.search(r"BDMV[/\\]STREAM", event_path, re.IGNORECASE):
@@ -413,7 +417,7 @@ class CloudCopy(_PluginBase):
                     logger.warn(f"{event_path.name} 未找到对应的文件")
                     return
                 # 识别媒体信息
-                if not file_meta.name:
+                if not media_file_flag or not file_meta.name:
                     mediainfo: MediaInfo = None
                 else:
                     mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
