@@ -8,6 +8,7 @@
     "author": "wdmcheng",
     "level": 1,
     "history": {
+      "v1.0.8": "fix bugs",
       "v1.0.7": "fix bugs",
       "v1.0.6": "识别媒体信息开关，关闭可处理提速，但无法使用二级分类、刮削、重命名等功能",
       "v1.0.5": "fix bugs",

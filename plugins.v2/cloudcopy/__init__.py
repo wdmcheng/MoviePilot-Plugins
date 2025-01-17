@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.7"
+    plugin_version = "1.0.8"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -416,10 +416,13 @@ class CloudCopy(_PluginBase):
                 transfer_type = self._transferconf.get(mon_path)
 
                 # 查找这个文件项
-                file_item = self.storagechain.get_file_item(storage="local", path=file_path)
-                if not file_item:
-                    logger.warn(f"{event_path.name} 未找到对应的文件")
-                    return
+                if not self._fetch_mediainfo or not media_file_flag or not file_meta.name:
+                    file_item = None
+                else:
+                    file_item = self.storagechain.get_file_item(storage="local", path=file_path)
+                    if not file_item:
+                        logger.warn(f"{event_path.name} 未找到对应的文件")
+                        return
                 # 识别媒体信息
                 if not self._fetch_mediainfo or not media_file_flag or not file_meta.name:
                     mediainfo: MediaInfo = None
