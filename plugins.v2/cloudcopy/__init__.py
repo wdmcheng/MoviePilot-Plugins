@@ -64,7 +64,7 @@ class CloudCopy(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "1.0.8"
+    plugin_version = "1.0.9"
     # 插件作者
     plugin_author = "wdmcheng"
     # 作者主页
@@ -431,17 +431,18 @@ class CloudCopy(_PluginBase):
                 if not mediainfo and not self._ignore_meta_info_error_flag:
                     logger.warn(f'未识别到媒体信息，标题：{file_meta.name}')
                     # 新增转移失败历史记录
-                    his = self.transferhis.add_fail(
-                        fileitem=file_item,
-                        mode=transfer_type,
-                        meta=file_meta
-                    )
-                    if self._notify:
-                        self.post_message(
-                            mtype=NotificationType.Manual,
-                            title=f"{file_path.name} 未识别到媒体信息，无法入库！\n"
-                                  f"回复：```\n/redo {his.id} [tmdbid]|[类型]\n``` 手动识别转移。"
+                    if file_item:
+                        his = self.transferhis.add_fail(
+                            fileitem=file_item,
+                            mode=transfer_type,
+                            meta=file_meta
                         )
+                        if self._notify:
+                            self.post_message(
+                                mtype=NotificationType.Manual,
+                                title=f"{file_path.name} 未识别到媒体信息，无法入库！\n"
+                                      f"回复：```\n/redo {his.id} [tmdbid]|[类型]\n``` 手动识别转移。"
+                            )
                     return
 
                 if not mediainfo:
@@ -510,8 +511,9 @@ class CloudCopy(_PluginBase):
                     else:
                         state, error = None, f"不支持的整理方式：{transfer_type}"
                     if not state:
+                        logger.error(error)
                         # 新增转移失败历史记录
-                        if self._history:
+                        if self._history and file_item:
                             self.transferhis.add_fail(
                                 fileitem=file_item,
                                 mode=transfer_type,
@@ -541,7 +543,7 @@ class CloudCopy(_PluginBase):
                     # 转移失败
                     logger.warn(f"{file_path.name} 入库失败：{transferinfo.message}")
 
-                    if self._history:
+                    if self._history and mediainfo:
                         # 新增转移失败历史记录
                         self.transferhis.add_fail(
                             fileitem=file_item,
